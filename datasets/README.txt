@@ -1,0 +1,1 @@
+Place the treebank_3 directory in this directory.

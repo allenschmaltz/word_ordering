@@ -1,0 +1,27 @@
+# Train, run, and evaluate the NGram and LSTM models
+
+1. The NGram decoder is available in the `ngram` folder. Usage instructions and instructions for replicating our paper results are available in ngram/NGram_replication_instructions.txt.
+
+2. The LSTM training script and decoder are available in the `lstm` folder. Usage instructions and instructions for replicating our paper results are available in lstm/LSTM_replication_instructions.txt.
+
+Additional notes for comparing these and other models:
+
+For the validation split, we calculate BLEU against datasets/zgen_data_gold/valid_words_ref.txt. Similarly, for the test split, we calculate BLEU against datasets/zgen_data_gold/test_words_ref.txt. (These files are created by the preprocessing scripts.) These files are the original, non-processed texts. They do not contain explicit EOS symbols and do not contain base noun phrase annotations. They also do not contain low-frequency holder symbols. 
+
+As such, if your model generates UNK symbols, you should replace these--randomly where necessary (when a one-to-one mapping is not possible)--before calculating BLEU. Also, importantly, the BNP symbol tags, if used in generation, should be removed prior to calculating BLEU.
+
+An example script for doing this (randomly_replace_unkUNK.py) is provided in data/postprocessing. This receives as input the generated file (automatically re-ordered by your model of interest), the raw gold file (in zgen_data_gold), and the gold processed file (in zgen_data_npsyms_freq3_unkUNK). For example, for the validation set for the BNP case:
+
+python randomly_replace_unkUNK.py \
+--generated_reordering_with_unk ${THE_REORDERED_FILE_YOUR_SYSTEM_GENERATED} \
+--gold_unprocessed zgen_data_gold/valid_words_ref_npsyms.txt \
+--gold_processed zgen_data_npsyms_freq3_unkUNK/npsyms/valid_words_with_np_symbols_no_eos.txt \
+--out_file ${THE_OUTPUT_FILE_ON_WHICH_TO_ASSESS_BLEU} \
+--remove_npsyms
+
+(Note that this script assumes your generated reordered file has covered all words in the bag/multiset.)
+
+Note that for comparison to previous work, we calculate BLEU using ScoreBLEU.sh from the original ZGen repo (https://github.com/SUTDNLP/ZGen). It is included here for replication purposes in analysis/eval/zgen_bleu. Usage is as follows:
+
+./ScoreBLEU.sh -t ${GENERATED_FILE} -r ${REFERENCE_FILE_WITHOUT_BNP_SYMBOLS} -odir ${A_DIR_FOR_TEMPORARY_FILES}
+

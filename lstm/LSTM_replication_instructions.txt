@@ -1,0 +1,9 @@
+# LSTM replication instructions
+
+1. First, read through ngram/NGram_replication_instructions.txt, because at a high-level, the model creation, decoding, and evaluation steps of the NGram and LSTM models are the same.
+
+2. Run lstm_trainer.lua to train and save a model. The parameters used for the LSTM (Words+BNPs) and LSTM (Words) models are included in the replication examples in example_usage/lstm_example_use.sh.
+
+3. Next, decode a pre-shuffled sentence using lstm_decoder.lua. Examples for replicating the non-Gigaword beam 1 and 10 LSTM results from Table 2 (BNP, no BNP; future costs, no future costs) are included in example_usage/lstm_example_use.sh. 
+
+4. Evaluation is the same as with the NGram model: Remove special symbols with randomly_replace_unkUNK.py and evaluate BLEU using ScoreBLEU.sh.

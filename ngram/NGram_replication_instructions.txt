@@ -1,0 +1,89 @@
+The following are step-by-step instructions to replicate our N-Gram (Words+BNPs) and N-Gram (Words, without future costs) results:
+
+Preliminary:
+1. Install Python. The code has been tested with Python 2.7.11.
+2. Install KenLM, and install the KenLM Python bindings.
+3. Place the data and script files in accessible locations. (Modify the paths below as necessary.)
+
+DATA_DIR=TODO_ADD_DIR
+OUTPUT_DIR=TODO_ADD_DIR
+TEMP_DIR=TODO_ADD_DIR # this is a directory for temporary file from KenLM and ./ScoreBLEU.sh
+
+1. Build the 5-gram model with KenLM from the training file, as follows (the argument to the -S flag can be modified, as applicable):
+
+lmplz -o 5 -S 3145728K -T ${TEMP_DIR} <${DATA_DIR}/"zgen_data_npsyms_freq3_unkUNK/npsyms/train_words_with_np_symbols_no_eos.txt" >${OUTPUT_DIR}/LM5_noeos_withnpsyms_freq3_unkUNK.arpa
+
+2. For the future costs, build the unigram model with KenLM from the training file, as follows (the argument to the -S flag can be modified, as applicable):
+
+lmplz -o 1 -S 3145728K -T ${TEMP_DIR} --discount_fallback <${DATA_DIR}/"zgen_data_npsyms_freq3_unkUNK/npsyms/train_words_with_np_symbols_no_eos.txt" >${OUTPUT_DIR}/LM1_noeos_withnpsyms_freq3_unkUNK.arpa
+
+3. Run the N-gram decoder with parameters of interest. The input needs to be pre-shuffled. For example, for N-Gram-64 (Words+BNPs) on validation:
+
+SPLIT_NAME=valid
+BEAM_SIZE=64
+python ngram_decoder.py ${OUTPUT_DIR}/LM5_noeos_withnpsyms_freq3_unkUNK.arpa ${DATA_DIR}/zgen_data_npsyms_freq3_unkUNK/npsyms/${SPLIT_NAME}_words_with_np_symbols_shuffled_no_eos.txt ${BEAM_SIZE} --future ${OUTPUT_DIR}/LM1_noeos_withnpsyms_freq3_unkUNK.arpa > ${OUTPUT_DIR}/output_${SPLIT_NAME}_with_npsyms_futurecosts_beam${BEAM_SIZE}_lm5.txt
+
+4. A final step is needed to randomly (when necessary) replace the unk/UNK symbols and remove the BNP symbols. With the file created in Step 3:
+
+SPLIT_NAME=valid
+BEAM_SIZE=64
+
+python randomly_replace_unkUNK.py \
+--generated_reordering_with_unk ${OUTPUT_DIR}/output_${SPLIT_NAME}_with_npsyms_futurecosts_beam${BEAM_SIZE}_lm5.txt \
+--gold_unprocessed ${DATA_DIR}/zgen_data_gold/valid_words_ref_npsyms.txt \
+--gold_processed ${DATA_DIR}/zgen_data_npsyms_freq3_unkUNK/npsyms/valid_words_with_np_symbols_no_eos.txt \
+--out_file ${OUTPUT_DIR}/output_${SPLIT_NAME}_with_npsyms_futurecosts_beam${BEAM_SIZE}_lm5_removed_unk.txt \
+--remove_npsyms
+
+5. Run ScoreBLEU.sh from the ZGen repo, as in the following:
+
+SPLIT_NAME=valid
+BEAM_SIZE=64
+./ScoreBLEU.sh -t ${OUTPUT_DIR}/output_${SPLIT_NAME}_with_npsyms_futurecosts_beam${BEAM_SIZE}_lm5_removed_unk.txt -r ${DATA_DIR}/zgen_data_gold/valid_words_ref.txt -odir ${TEMP_DIR}
+
+Running the above should yield the following output:
+BLEU score = 0.5563 (0.5563 * 1.0000) for system "1"
+
+
+
+##############
+
+Similarly, to demonstrate another set of options, below are instructions for replicating our results for the N-Gram (Words, without future costs) model.
+
+
+1. Build the 5-gram model with KenLM from the training file, as follows (the argument to the -S flag can be modified, as applicable):
+
+lmplz -o 5 -S 3145728K -T ${TEMP_DIR} <${DATA_DIR}/"zgen_data_npsyms_freq3_unkUNK/no_npsyms/train_words_no_eos.txt" >${MODEL_DIR}/LM5_noeos_no_npsyms_freq3_unkUNK.arpa
+
+2. In this case, future costs are not used, so we skip building a unigram LM.
+
+3. Run the N-gram decoder with parameters of interest. The input needs to be pre-shuffled. For example, for N-Gram-64 (Words, without future costs) on validation (note that --future is not used in this case):
+
+SPLIT_NAME=valid
+BEAM_SIZE=64
+python ngram_decoder.py ${MODEL_DIR}/LM5_noeos_no_npsyms_freq3_unkUNK.arpa ${DATA_DIR}/zgen_data_npsyms_freq3_unkUNK/no_npsyms/${SPLIT_NAME}_words_fullyshuffled_no_eos.txt ${BEAM_SIZE} > ${OUTPUT_DIR}/output_${SPLIT_NAME}_no_npsyms_nofuturecosts_beam${BEAM_SIZE}_lm5.txt
+
+4. A final step is needed to randomly (when necessary) replace the unk/UNK symbols. With the file created in Step 3:
+
+SPLIT_NAME=valid
+BEAM_SIZE=64
+
+python ${REPO_DIR}/data/postprocessing/randomly_replace_unkUNK.py \
+--generated_reordering_with_unk ${OUTPUT_DIR}/output_${SPLIT_NAME}_no_npsyms_nofuturecosts_beam${BEAM_SIZE}_lm5_FIXED \
+--gold_unprocessed ${DATA_DIR}/zgen_data_gold/${SPLIT_NAME}_words_ref.txt \
+--gold_processed ${DATA_DIR}/zgen_data_npsyms_freq3_unkUNK/no_npsyms/${SPLIT_NAME}_words_no_eos.txt \
+--out_file {OUTPUT_DIR}/output_${SPLIT_NAME}_no_npsyms_nofuturecosts_beam${BEAM_SIZE}_lm5_removed_unk.txt \
+--remove_npsyms
+
+
+5. Run ScoreBLEU.sh from the ZGen repo, as in the following:
+
+SPLIT_NAME=valid
+BEAM_SIZE=64
+./ScoreBLEU.sh -t {OUTPUT_DIR}/output_${SPLIT_NAME}_no_npsyms_nofuturecosts_beam${BEAM_SIZE}_lm5_removed_unk.txt -r ${DATA_DIR}/zgen_data_gold/valid_words_ref.txt -odir ${TEMP_DIR}
+
+Running the above should yield the following output:
+BLEU score = 0.3257 (0.3257 * 1.0000) for system "1"
+
+
+### Additional usage examples are available in example_usage/ngram_example_use.sh.
